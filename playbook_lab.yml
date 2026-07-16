@@ -1,0 +1,59 @@
+---
+# playbook_lab.yml
+# Executa a configuração da RBAC e das interfaces seguindo a padronização via gerenciador 'apt'
+
+- name: Play 1 - Configuração do Servidor Gestor
+  hosts: gestores
+  become: true
+  
+  tasks:
+    - name: Atualizar o cache do gerenciador apt
+      ansible.builtin.apt:
+        update_cache: true
+        # Define cache_valid_time para idempotência (evita atualizar o apt repetidas vezes se já atualizou recentemente)
+        cache_valid_time: 3600 
+
+    - name: Criar usuário 'gestor_pro' com privilégios administrativos
+      ansible.builtin.user:
+        name: gestor_pro
+        state: present
+        groups: sudo
+        append: true
+        shell: /bin/bash
+        create_home: true
+
+
+- name: Play 2 - Configuração do Terminal Público
+  hosts: publico
+  become: true
+  
+  tasks:
+    - name: Adicionar o repositório 'universe'
+      ansible.builtin.apt_repository:
+        # Utiliza a variável do ansible para pegar automaticamente o codinome do Ubuntu (ex: jammy)
+        repo: "deb http://archive.ubuntu.com/ubuntu {{ ansible_distribution_release }} universe"
+        state: present
+
+    - name: Atualizar o cache do gerenciador apt após adicionar o novo repositório
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Instalar a interface gráfica e o gerenciador de login
+      # NOTA PARA O FUTURO:
+      # Para emular o visual do Kubuntu (KDE), basta alterar a lista de pacotes abaixo.
+      # Substitua a linha '- cinnamon-desktop-environment' por '- kde-plasma-desktop'.
+      ansible.builtin.apt:
+        name:
+          - cinnamon-desktop-environment
+          - lightdm
+        state: present
+
+    - name: Criar usuário 'aluno' com perfil restrito
+      ansible.builtin.user:
+        name: aluno
+        state: present
+        shell: /bin/bash
+        create_home: true
+        # Importante: Como não especificamos 'groups: sudo' e nem 'append: true',
+        # o Ansible garante a idempotência da restrição mantendo o usuário com
+        # privilégio mínimo (ele não fará parte do grupo de administradores).
