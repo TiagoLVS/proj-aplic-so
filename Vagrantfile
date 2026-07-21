@@ -38,12 +38,15 @@ Vagrant.configure("2") do |config|
     # Provisionamento Shell: Instala o Ansible no momento do boot
     # O comando 'apt-get update' é necessário para garantir que os repositórios 
     # locais estão atualizados antes de instalar novos pacotes.
-    admin.vm.provision "shell", inline: <<-SHELL
-      export DEBIAN_FRONTEND=noninteractive
-      apt-get update
-      apt-get install -y software-properties-common ansible
-      echo "Ansible instalado com sucesso no nó de controle."
-    SHELL
+  admin.vm.provision "shell", inline: <<-SHELL
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y software-properties-common ansible locales
+    locale-gen en_US.UTF-8
+    echo 'export LC_ALL=en_US.UTF-8' >> /home/vagrant/.bashrc
+    echo 'export LANG=en_US.UTF-8' >> /home/vagrant/.bashrc
+    echo "Ansible instalado com sucesso no nó de controle."
+  SHELL
   end
 
 
