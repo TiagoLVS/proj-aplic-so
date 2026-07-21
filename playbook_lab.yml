@@ -48,11 +48,20 @@
           - lightdm
         state: present
 
+    - name: Definir o lightdm como gerenciador de exibição padrão
+      ansible.builtin.copy:
+        content: "/usr/sbin/lightdm\n"
+        dest: /etc/X11/default-display-manager
+        owner: root
+        group: root
+        mode: '0644'
+
     - name: Garantir que o lightdm está habilitado e rodando
       ansible.builtin.systemd:
         name: lightdm
         enabled: true
-        state: started
+        state: restarted
+        daemon_reload: true
 
     - name: Criar usuário 'aluno' com perfil restrito
       ansible.builtin.user:
