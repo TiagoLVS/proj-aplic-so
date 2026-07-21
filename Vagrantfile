@@ -52,12 +52,13 @@ Vagrant.configure("2") do |config|
 
   # ==============================================================================
   # 2. Servidor de Trabalho (Usuário Gestor)
-  # OS: ubuntu/noble64 (Ubuntu 24.04 LTS)
+  # OS: bento/ubuntu-24.04 (Ubuntu 24.04 LTS)
   # 
   # Justificativa da escolha: O Ubuntu 24.04 (Noble Numbat) é a versão Long Term 
-  # Support (LTS) mais recente da Canonical. Ele traz as versões mais modernas de 
-  # pacotes e bibliotecas necessárias para rodar serviços de backend e ferramentas 
-  # profissionais, mantendo a compatibilidade do apt e uma robusta política de segurança.
+  # Support (LTS) mais recente da Canonical. Como a Canonical descontinuou a 
+  # publicação de boxes oficiais para o Vagrant a partir do 24.04, utilizamos a 
+  # box mantida pela comunidade Bento (Chef/Bento Project), que reproduz o mesmo 
+  # sistema Ubuntu 24.04 e mantém total compatibilidade com apt e VirtualBox.
   # ==============================================================================
   config.vm.define "gestor-server" do |gestor|
     gestor.vm.box = "bento/ubuntu-24.04"
