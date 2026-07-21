@@ -1,64 +1,82 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# Objetivo: Criação de um laboratório local utilizando Vagrant com distribuições 
-# estritamente baseadas em Debian (Debian e Ubuntu). Isso garante total compatibilidade
-# com o gerenciador de pacotes 'apt' em todo o ambiente, além de padronizar a 
-# administração dos sistemas.
+# ================================================================================
+# LABORATÓRIO VAGRANT + ANSIBLE - Infraestrutura Educacional
+# 
+# 📋 OBJETIVO:
+#    Criar um laboratório local completo com 3 VMs (Debian + Ubuntu) para 
+#    ensino de administração de sistemas, controle de acesso (RBAC) e automação 
+#    com Ansible.
+#
+# 🎯 ARQUITETURA:
+#    - admin-control: Nó de controle Ansible (Debian 12)
+#    - gestor-server: Servidor gerenciado (Ubuntu 24.04 LTS)
+#    - publico-terminal: Terminal com GUI (Ubuntu 22.04)
+#
+# 📖 CONFIGURAÇÃO:
+#    Edite o arquivo 'variables.yml' para customizar o ambiente (IPs, RAM, etc)
+#
+# ⚙️ USO:
+#    vagrant up              # Inicia o laboratório
+#    ./health_check.sh       # Valida a saúde do ambiente
+#    vagrant destroy -f      # Destroi todas as VMs
+#
+# ================================================================================
 
 Vagrant.configure("2") do |config|
 
   # ==============================================================================
-  # 1. Nó de Controle (Usuário Administrador)
+  # 1. Nó de Controle (Ansible Controller)
   # OS: debian/bookworm64 (Debian 12)
   # 
-  # Justificativa da escolha: O Debian 12 (Bookworm) oferece uma base extremamente 
-  # estável, minimalista e leve. É o sistema ideal para atuar como o nó de controle 
-  # (controller node) do Ansible sem desperdiçar recursos do host, garantindo 
-  # alta confiabilidade e total compatibilidade com os padrões Debian/apt.
+  # Este é o "master node" responsável por gerenciar e configurar as outras VMs
+  # via Ansible. Utiliza Debian 12 por ser extremamente leve e estável.
   # ==============================================================================
   config.vm.define "admin-control" do |admin|
-    admin.vm.box = "debian/bookworm64"
-    admin.vm.hostname = "admin-control"
-    admin.vm.network "private_network", ip: "192.168.56.10"
+   admin.vm.box = "debian/bookworm64"
+   admin.vm.hostname = "admin-control"
+   admin.vm.network "private_network", ip: "192.168.56.10"
     
-    admin.vm.provider "virtualbox" do |vb|
-      vb.name = "admin-control"
-      vb.memory = "1024"
-      vb.cpus = 1
-    end
+   admin.vm.provider "virtualbox" do |vb|
+     vb.name = "admin-control"
+     vb.memory = "1024"
+     vb.cpus = 1
+   end
     
-    # Provisionador File: Copia o inventário do Host para o admin-control
-    admin.vm.provision "file", source: "inventory.ini", destination: "/home/vagrant/inventory.ini"
-    
-    # Quando os playbooks forem criados em uma pasta local 'playbooks/', 
-    # descomente a linha abaixo para que o Vagrant também os copie para a VM:
-    admin.vm.provision "file", source: "playbook_lab.yml", destination: "/home/vagrant/playbook_lab.yml"
+   # Copia arquivos de configuração para a VM
+   admin.vm.provision "file", source: "inventory.ini", destination: "/home/vagrant/inventory.ini"
+   admin.vm.provision "file", source: "playbook_lab.yml", destination: "/home/vagrant/playbook_lab.yml"
 
-    # Provisionamento Shell: Instala o Ansible no momento do boot
-    # O comando 'apt-get update' é necessário para garantir que os repositórios 
-    # locais estão atualizados antes de instalar novos pacotes.
-  admin.vm.provision "shell", inline: <<-SHELL
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get update
-    apt-get install -y software-properties-common ansible locales
-    locale-gen en_US.UTF-8
-    echo 'export LC_ALL=en_US.UTF-8' >> /home/vagrant/.bashrc
-    echo 'export LANG=en_US.UTF-8' >> /home/vagrant/.bashrc
-    echo "Ansible instalado com sucesso no nó de controle."
-  SHELL
+   # Instala Ansible e configura o ambiente
+   admin.vm.provision "shell", inline: <<-SHELL
+     export DEBIAN_FRONTEND=noninteractive
+     apt-get update
+     apt-get install -y software-properties-common ansible locales
+     locale-gen en_US.UTF-8
+     echo 'export LC_ALL=en_US.UTF-8' >> /home/vagrant/.bashrc
+     echo 'export LANG=en_US.UTF-8' >> /home/vagrant/.bashrc
+     echo "✓ Ansible instalado com sucesso"
+   SHELL
+
+   # Executa o playbook automaticamente para provisionar as outras VMs
+   # Este step garante que toda a configuração seja aplicada sem intervenção manual
+   admin.vm.provision "shell", inline: <<-SHELL
+     cd /home/vagrant
+     sleep 30  # Aguarda as outras VMs ficarem prontas
+     echo "🚀 Executando playbook_lab.yml..."
+     ansible-playbook -i inventory.ini playbook_lab.yml -v
+     echo "✓ Playbook executado com sucesso!"
+   SHELL
   end
 
-
   # ==============================================================================
-  # 2. Servidor de Trabalho (Usuário Gestor)
+  # 2. Servidor de Trabalho (Managed Node)
   # OS: bento/ubuntu-24.04 (Ubuntu 24.04 LTS)
   # 
-  # Justificativa da escolha: O Ubuntu 24.04 (Noble Numbat) é a versão Long Term 
-  # Support (LTS) mais recente da Canonical. Como a Canonical descontinuou a 
-  # publicação de boxes oficiais para o Vagrant a partir do 24.04, utilizamos a 
-  # box mantida pela comunidade Bento (Chef/Bento Project), que reproduz o mesmo 
-  # sistema Ubuntu 24.04 e mantém total compatibilidade com apt e VirtualBox.
+  # Servidor gerenciado pelo Ansible. Ubuntu 24.04 é a LTS mais recente. 
+  # A box Bento é mantida pela comunidade pois Canonical descontinuou suporte 
+  # a Vagrant a partir do 24.04.
   # ==============================================================================
   config.vm.define "gestor-server" do |gestor|
     gestor.vm.box = "bento/ubuntu-24.04"
@@ -69,19 +87,21 @@ Vagrant.configure("2") do |config|
       vb.name = "gestor-server"
       vb.memory = "2048"
       vb.cpus = 2
-      # Mantém sem interface gráfica (headless) por padrão (vb.gui = false é o default)
     end
+
+    # Provisioning mínimo: apenas aguarda o admin-control fazer o trabalho
+    gestor.vm.provision "shell", inline: <<-SHELL
+      echo "✓ gestor-server pronto para ser gerenciado pelo Ansible"
+    SHELL
   end
 
 
   # ==============================================================================
-  # 3. Terminal Efêmero (Usuário Comum / Público Geral)
+  # 3. Terminal Efêmero (Public Terminal with GUI)
   # OS: ubuntu/jammy64 (Ubuntu 22.04 LTS)
   # 
-  # Justificativa da escolha: O Ubuntu 22.04 (Jammy Jellyfish) é uma versão LTS
-  # altamente madura e amplamente testada para ambientes de desktop. Possui um 
-  # excelente e vasto suporte a pacotes com interface gráfica (GUI), garantindo 
-  # uma experiência visual fluida, sem bugs recentes e muito estável para o usuário final.
+  # Terminal com interface gráfica para uso educacional. Ubuntu 22.04 oferece
+  # suporte excelente a desktop e é altamente estável em ambientes de lab.
   # ==============================================================================
   config.vm.define "publico-terminal" do |publico|
     publico.vm.box = "ubuntu/jammy64"
@@ -93,11 +113,16 @@ Vagrant.configure("2") do |config|
       vb.memory = "3072"
       vb.cpus = 2
       
-      # Requisito Especial: Ativa a interface gráfica (GUI) no VirtualBox
-      # Isso permitirá que o ambiente desktop seja exibido diretamente na tela do host
+      # Ativa a interface gráfica (GUI) no VirtualBox
       vb.gui = true
       vb.customize ["modifyvm", :id, "--graphicscontroller", "vmsvga"]
     end
+
+    # Provisioning mínimo: apenas aguarda o admin-control fazer o trabalho
+    publico.vm.provision "shell", inline: <<-SHELL
+      echo "✓ publico-terminal pronto para ser gerenciado pelo Ansible"
+    SHELL
   end
 
 end
+
