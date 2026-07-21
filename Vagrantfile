@@ -96,6 +96,7 @@ Vagrant.configure("2") do |config|
       # Requisito Especial: Ativa a interface gráfica (GUI) no VirtualBox
       # Isso permitirá que o ambiente desktop seja exibido diretamente na tela do host
       vb.gui = true
+      vb.customize ["modifyvm", :id, "--graphicscontroller", "vmsvga"]
     end
   end
 
