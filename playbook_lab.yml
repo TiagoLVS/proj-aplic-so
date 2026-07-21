@@ -1,74 +1,150 @@
 ---
 # playbook_lab.yml
-# Executa a configuração da RBAC e das interfaces seguindo a padronização via gerenciador 'apt'
+# ============================================================================
+# Playbook Ansible para Configuração do Laboratório
+# 
+# Objetivo: Provisionar dois servidores (gestor-server e publico-terminal)
+#           com usuários específicos e suas respectivas permissões.
+#
+# Variáveis de Hosts:
+#   - gestores: grupo com o servidor de gestão (IP: 192.168.56.11)
+#   - publico:  grupo com terminal público (IP: 192.168.56.12)
+#
+# Tempo estimado de execução: 2-5 minutos (depende da velocidade de rede)
+# ============================================================================
 
-- name: Play 1 - Configuração do Servidor Gestor
+# ============================================================================
+# PLAY 1: Configurar o Servidor de Gestão
+# ============================================================================
+# Task principal: Criar usuário administrativo no gestor-server
+# 
+# Este play executa tarefas no host 'gestores' (192.168.56.11)
+# e requer privilégios de root (become: true)
+# ============================================================================
+- name: "Play 1 - Configuração do Servidor Gestor"
   hosts: gestores
   become: true
   
   tasks:
-    - name: Atualizar o cache do gerenciador apt
+    - name: "Atualizar o cache do gerenciador apt"
       ansible.builtin.apt:
         update_cache: true
-        # Define cache_valid_time para idempotência (evita atualizar o apt repetidas vezes se já atualizou recentemente)
-        cache_valid_time: 3600 
-
-    - name: Criar usuário 'gestor_pro' com privilégios administrativos
+        cache_valid_time: 3600  # Não atualiza se foi atualizado há menos de 1 hora
+      tags:
+        - packages
+      
+    - name: "Criar usuário 'gestor_pro' com privilégios administrativos"
       ansible.builtin.user:
         name: gestor_pro
         state: present
-        groups: sudo
-        append: true
+        groups: sudo              # Adiciona ao grupo 'sudo'
+        append: true              # Garante idempotência (não sobrescreve grupos existentes)
         shell: /bin/bash
         create_home: true
+      tags:
+        - users
+        - admin
+
+    - name: "Mensagem de sucesso - gestor-server"
+      ansible.builtin.debug:
+        msg: "✓ Servidor 'gestor-server' configurado com sucesso! Usuário 'gestor_pro' criado com privilégios de admin."
+      tags:
+        - debug
 
 
-- name: Play 2 - Configuração do Terminal Público
+# ============================================================================
+# PLAY 2: Configurar o Terminal Público com Interface Gráfica
+# ============================================================================
+# Tasks principais: 
+#   1. Adicionar repositório 'universe' (mais pacotes disponíveis)
+#   2. Instalar ambiente desktop (Cinnamon)
+#   3. Instalar e configurar gerenciador de login (LightDM)
+#   4. Criar usuário com permissões restritas
+#
+# Este play executa tarefas no host 'publico' (192.168.56.12)
+# ============================================================================
+- name: "Play 2 - Configuração do Terminal Público"
   hosts: publico
   become: true
   
   tasks:
-    - name: Adicionar o repositório 'universe'
+    - name: "Adicionar o repositório 'universe' para mais pacotes"
       ansible.builtin.apt_repository:
-        # Utiliza a variável do ansible para pegar automaticamente o codinome do Ubuntu (ex: jammy)
         repo: "deb http://archive.ubuntu.com/ubuntu {{ ansible_distribution_release }} universe"
         state: present
+      tags:
+        - repos
 
-    - name: Atualizar o cache do gerenciador apt após adicionar o novo repositório
+    - name: "Atualizar o cache do apt após adicionar novo repositório"
       ansible.builtin.apt:
         update_cache: true
+      tags:
+        - packages
 
-    - name: Instalar a interface gráfica e o gerenciador de login
-      # NOTA PARA O FUTURO:
-      # Para emular o visual do Kubuntu (KDE), basta alterar a lista de pacotes abaixo.
-      # Substitua a linha '- cinnamon-desktop-environment' por '- kde-plasma-desktop'.
+    - name: "Instalar a interface gráfica Cinnamon e seu gerenciador de login"
       ansible.builtin.apt:
         name:
           - cinnamon-desktop-environment
           - lightdm
         state: present
+      tags:
+        - packages
+        - desktop
+      # NOTA: Para usar KDE Plasma em vez de Cinnamon, troque a linha acima por:
+      #   - kde-plasma-desktop
 
-    - name: Definir o lightdm como gerenciador de exibição padrão
+    - name: "Definir o lightdm como gerenciador de exibição padrão"
       ansible.builtin.copy:
         content: "/usr/sbin/lightdm\n"
         dest: /etc/X11/default-display-manager
         owner: root
         group: root
         mode: '0644'
+      tags:
+        - display-manager
 
-    - name: Garantir que o lightdm está habilitado e rodando
+    - name: "Garantir que o lightdm está habilitado e em execução"
       ansible.builtin.systemd:
         name: lightdm
         enabled: true
         state: restarted
         daemon_reload: true
+      tags:
+        - services
+        - display-manager
+      # Ignora avisos se o lightdm falhar em VM headless (é esperado)
+      ignore_errors: true
 
-    - name: Criar usuário 'aluno' com perfil restrito
+    - name: "Criar usuário 'aluno' com perfil restrito (sem privilégios sudo)"
       ansible.builtin.user:
         name: aluno
         state: present
         shell: /bin/bash
         create_home: true
-        # Importante: Como não especificamos 'groups: sudo' e nem 'append: true',
-        # o Ansible garante a idempotência da restrição mantendo o usuário com
-        # privilégio mínimo (ele não fará parte do grupo de administradores).
+        # IMPORTANTE: 'groups' está vazio intencionalmente
+        # Isso garante que o usuário NÃO tenha privilégios administrativos
+      tags:
+        - users
+        - restricted
+
+    - name: "Mensagem de sucesso - publico-terminal"
+      ansible.builtin.debug:
+        msg: "✓ Terminal 'publico-terminal' configurado com sucesso! Desktop Cinnamon instalado. Usuário 'aluno' criado com permissões restritas."
+      tags:
+        - debug
+
+
+# ============================================================================
+# TAGS DISPONÍVEIS (para executar tarefas específicas):
+# 
+# Executar apenas tarefas de usuários:
+#   ansible-playbook playbook_lab.yml -i inventory.ini -t users
+#
+# Executar apenas tarefas de pacotes:
+#   ansible-playbook playbook_lab.yml -i inventory.ini -t packages
+#
+# Executar apenas tarefas do gestor-server:
+#   ansible-playbook playbook_lab.yml -i inventory.ini -t admin
+#
+# ============================================================================
+

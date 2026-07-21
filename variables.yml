@@ -1,0 +1,66 @@
+# variables.yml - Configurações centralizadas do laboratório
+# Edite este arquivo para customizar o ambiente
+
+# Configurações de Rede
+network:
+  base_ip: "192.168.56"
+  netmask: "255.255.255.0"
+
+# Configurações das VMs
+vms:
+  admin:
+    name: "admin-control"
+    box: "debian/bookworm64"
+    hostname: "admin-control"
+    ip: "192.168.56.10"
+    memory: 1024
+    cpus: 1
+    description: "Nó de Controle do Ansible"
+
+  gestor:
+    name: "gestor-server"
+    box: "bento/ubuntu-24.04"
+    hostname: "gestor-server"
+    ip: "192.168.56.11"
+    memory: 2048
+    cpus: 2
+    description: "Servidor Gerenciado (Ubuntu 24.04 LTS)"
+
+  publico:
+    name: "publico-terminal"
+    box: "ubuntu/jammy64"
+    hostname: "publico-terminal"
+    ip: "192.168.56.12"
+    memory: 3072
+    cpus: 2
+    gui: true
+    description: "Terminal Público com Interface Gráfica (Ubuntu 22.04)"
+
+# Configurações de Usuários
+users:
+  admin:
+    username: "gestor_pro"
+    groups:
+      - "sudo"
+    shell: "/bin/bash"
+    on_vm: "gestor-server"
+
+  restricted:
+    username: "aluno"
+    groups: []
+    shell: "/bin/bash"
+    on_vm: "publico-terminal"
+
+# Configurações de Desktop (publico-terminal)
+desktop:
+  environment: "cinnamon"  # Opções: cinnamon, kde, gnome
+  display_manager: "lightdm"
+  packages:
+    - "cinnamon-desktop-environment"
+    - "lightdm"
+
+# Configurações de Ansible
+ansible:
+  inventory_file: "inventory.ini"
+  playbook_file: "playbook_lab.yml"
+  auto_run: true  # Executa o playbook automaticamente após provisioning
