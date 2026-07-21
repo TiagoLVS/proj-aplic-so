@@ -33,7 +33,7 @@ Vagrant.configure("2") do |config|
     
     # Quando os playbooks forem criados em uma pasta local 'playbooks/', 
     # descomente a linha abaixo para que o Vagrant também os copie para a VM:
-    # admin.vm.provision "file", source: "playbooks/", destination: "/home/vagrant/playbooks/"
+    admin.vm.provision "file", source: "playbook_lab.yml", destination: "/home/vagrant/playbook_lab.yml"
 
     # Provisionamento Shell: Instala o Ansible no momento do boot
     # O comando 'apt-get update' é necessário para garantir que os repositórios 
