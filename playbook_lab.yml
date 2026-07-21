@@ -48,6 +48,12 @@
           - lightdm
         state: present
 
+    - name: Garantir que o lightdm está habilitado e rodando
+      ansible.builtin.systemd:
+        name: lightdm
+        enabled: true
+        state: started
+
     - name: Criar usuário 'aluno' com perfil restrito
       ansible.builtin.user:
         name: aluno
