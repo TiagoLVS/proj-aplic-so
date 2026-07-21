@@ -57,7 +57,7 @@ Vagrant.configure("2") do |config|
   # profissionais, mantendo a compatibilidade do apt e uma robusta política de segurança.
   # ==============================================================================
   config.vm.define "gestor-server" do |gestor|
-    gestor.vm.box = "ubuntu/noble64"
+    gestor.vm.box = "bento/ubuntu-24.04"
     gestor.vm.hostname = "gestor-server"
     gestor.vm.network "private_network", ip: "192.168.56.11"
     
